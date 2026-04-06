@@ -1,4 +1,14 @@
-# HackScan — AI 게임 핵 감지 도구
+# HackScan — AI 게임 핵 감지 도구 / AI Game Hack Detector / AI ゲームチート検出ツール
+
+**언어 / Language / 言語**
+
+🇰🇷 [한국어](#-한국어) · 🇺🇸 [English](#-english) · 🇯🇵 [日本語](#-日本語)
+
+---
+
+---
+
+# 🇰🇷 한국어
 
 > ⚠️ **교육 목적 프로젝트입니다.**
 > 이 프로젝트는 웹 개발, AI API 연동, 클라이언트 사이드 영상 처리 등의 학습을 위한 교육용 예제입니다.
@@ -133,3 +143,283 @@ index.html
 
 본 프로젝트는 **교육 및 학습 목적**으로 자유롭게 사용·수정할 수 있습니다.
 상업적 이용 및 실제 핵 탐지 서비스로의 전용은 권장하지 않습니다.
+
+---
+
+---
+
+# 🇺🇸 English
+
+> ⚠️ **This is an educational project.**
+> This project is a learning example for web development, AI API integration, and client-side video processing.
+> Do not use it for actual cheat detection or to falsely report other players.
+> Analysis results are AI inferences and have no legal validity.
+
+---
+
+## 📖 Project Overview
+
+HackScan is a client-side web application built as a **single HTML file**.
+When a user uploads a game video and enters a Groq API key, Llama AI analyzes the video frame and metadata, returns a cheat suspicion assessment in JSON format, and renders the results visually.
+
+There is no server — all processing happens in the browser.
+
+---
+
+## 🎯 Learning Objectives
+
+This project lets you practice the following concepts:
+
+| Area | Content |
+|------|---------|
+| **AI API Integration** | Direct Groq API calls (`/openai/v1/chat/completions`), browser-to-API auth, JSON prompt engineering |
+| **Video Processing** | Blob URL creation with `<video>`, frame capture via Canvas, async handling with `seeked` events |
+| **DOM Manipulation** | Dynamic UI rendering with vanilla JavaScript, event delegation, classList manipulation |
+| **Security Basics** | XSS prevention with `escHtml()`, whitelist validation of external inputs, CSS class injection prevention |
+| **UX Patterns** | Progress animations, toast notifications, drag-and-drop uploads, responsive layout |
+| **Memory Management** | Blob URL cleanup with `URL.revokeObjectURL()`, preventing duplicate event listener registration |
+
+---
+
+## 🗂️ File Structure
+
+```
+index.html          # Full application (CSS + HTML + JS in a single file)
+README.md           # This document
+```
+
+---
+
+## 🚀 Getting Started
+
+No build step or server required — just open `index.html` in your browser.
+
+```bash
+# Open locally
+open index.html
+
+# Or use a simple local server (recommended)
+python3 -m http.server 8080
+# Then visit http://localhost:8080
+```
+
+### Usage Steps
+
+1. Select a game (Valorant, PUBG, Overwatch 2, LoL, Apex, CS2)
+2. Configure detection sensitivity / perspective / analysis depth
+3. Upload a game video (MP4, AVI, MOV, MKV, WebM / up to 2GB)
+4. Enter your API key from [Groq Console](https://console.groq.com/keys)
+5. Click **Start Analysis**
+
+---
+
+## 🔑 API Key Notes
+
+- Your API key is sent **directly** from the browser to Groq's servers.
+- It is **never stored** on this application's server or any third party.
+- However, request headers may be visible in browser DevTools, so avoid using this on public computers.
+- Groq currently offers a free tier, but usage fees may apply depending on your consumption.
+
+---
+
+## ⚙️ Code Structure
+
+```
+index.html
+├── <style>          CSS variable system, per-component styles, responsive media queries
+├── <body>
+│   ├── <nav>        Fixed top navigation bar
+│   ├── .hero        Hero section (demo stats display)
+│   └── .main
+│       ├── Upload panel    Game select / analysis config / file upload / API key
+│       ├── Progress panel  Step-by-step analysis progress display
+│       └── Result panel    Verdict banner / metric cards / video player / timeline / report
+└── <script>
+    ├── Utility        escHtml(), toast()
+    ├── State          Global state variables
+    ├── File handling  loadFile(), handleDrop(), handleFile()
+    ├── Video player   seekTo(), togglePlay(), toggleMute(), onTimeUpdate()
+    ├── Progress       initProgress(), advanceStep(), finishProgress()
+    ├── AI prompt      buildPrompt() — game-specific prompt generation
+    ├── API call       startAnalysis() — fetch → JSON parse → renderResult()
+    └── Render         renderResult(), jumpTo()
+```
+
+---
+
+## 🛠️ Tech Stack
+
+- **Language**: Vanilla HTML / CSS / JavaScript (no frameworks)
+- **AI Model**: `meta-llama/llama-4-scout-17b-16e-instruct` (Groq)
+- **Fonts**: Google Fonts — Syne, Space Mono, DM Sans
+- **External Dependencies**: None (excluding CDN fonts)
+
+---
+
+## ⚠️ Limitations & Disclaimers
+
+- **The AI does not directly analyze the video.** It generates a *simulated analysis result* based on a single captured frame and file metadata (name, size).
+- Results are at **educational demo** level and are not equivalent to real anti-cheat systems (Vanguard, BattlEye, etc.).
+- Using analysis results to falsely report or defame others may result in legal liability.
+
+---
+
+## 🐛 Changelog (for educational reference)
+
+This project has been reviewed and revised multiple times for code quality. Key changes:
+
+- `play`/`pause` icon: `<polygon>` → `<path id="playIcon">` to fix `setAttribute('d')` behavior
+- `URL.createObjectURL` Blob leak fix: call `revokeObjectURL()` on file replacement
+- `finishProgress` loop boundary fix: `i <= STEPS.length` → `i < STEPS.length`
+- Frame capture timing: fixed `setTimeout(400)` → `seeked` event wait (with 1500ms fallback)
+- AI response CSS class injection prevention: whitelist validation for `verdict`, `severity`, `probType`
+- Duplicate event listener prevention: `listenersAdded` guard covering `play`/`pause`
+- `escHtml()` moved to top of script to fix declaration ordering issues
+- API migration: Anthropic Claude → Groq (OpenAI-compatible format, Bearer auth)
+
+---
+
+## 📄 License
+
+This project is free to use and modify for **educational and learning purposes**.
+Commercial use or deployment as an actual cheat detection service is not recommended.
+
+---
+
+---
+
+# 🇯🇵 日本語
+
+> ⚠️ **これは教育目的のプロジェクトです。**
+> このプロジェクトは、Web開発・AI API連携・クライアントサイド動画処理などを学ぶための教育用サンプルです。
+> 実際のチート検出目的での使用や、根拠なく他者を通報する用途には使用しないでください。
+> 分析結果はAIの推論であり、いかなる法的効力も持ちません。
+
+---
+
+## 📖 プロジェクト概要
+
+HackScanは**単一HTMLファイル**で構成されたクライアントサイドWebアプリケーションです。
+ユーザーがゲーム動画をアップロードしてGroq APIキーを入力すると、Llama AIが動画のフレームとメタデータを分析し、チート使用の疑いをJSON形式で返却して結果をビジュアル表示します。
+
+サーバーは不要で、すべての処理はブラウザ内で完結します。
+
+---
+
+## 🎯 学習目標
+
+このプロジェクトを通じて、以下の概念を実習できます。
+
+| 分野 | 内容 |
+|------|------|
+| **AI API連携** | Groq API（`/openai/v1/chat/completions`）の直接呼び出し、ブラウザ→API認証、JSONプロンプトエンジニアリング |
+| **動画処理** | `<video>`要素によるBlob URL生成、Canvasを用いたフレームキャプチャ、`seeked`イベントによる非同期処理 |
+| **DOM操作** | バニラJavaScriptによる動的UIレンダリング、イベント委譲、classList操作 |
+| **セキュリティ基礎** | `escHtml()`によるXSS防止、外部入力値のホワイトリスト検証、CSSクラスインジェクション防止 |
+| **UXパターン** | プログレスアニメーション、トースト通知、ドラッグ＆ドロップアップロード、レスポンシブレイアウト |
+| **メモリ管理** | `URL.revokeObjectURL()`によるBlob URL解放、イベントリスナーの重複登録防止 |
+
+---
+
+## 🗂️ ファイル構成
+
+```
+index.html          # アプリケーション全体（CSS + HTML + JS 単一ファイル）
+README.md           # このドキュメント
+```
+
+---
+
+## 🚀 実行方法
+
+ビルドやサーバーは不要です。`index.html`をブラウザで直接開くだけで動作します。
+
+```bash
+# ローカルで開く
+open index.html
+
+# または簡易ローカルサーバーを使用（推奨）
+python3 -m http.server 8080
+# ブラウザで http://localhost:8080 にアクセス
+```
+
+### 使用手順
+
+1. ゲームを選択（Valorant・PUBG・Overwatch 2・LoL・Apex・CS2）
+2. 検出感度 / 視点 / 分析深度を設定
+3. ゲーム動画をアップロード（MP4・AVI・MOV・MKV・WebM / 最大2GB）
+4. [Groq Console](https://console.groq.com/keys)で取得したAPIキーを入力
+5. **分析開始**をクリック
+
+---
+
+## 🔑 APIキーについて
+
+- APIキーはブラウザからGroqサーバーへ**直接**送信されます。
+- このアプリのサーバーや第三者には**一切保存されません。**
+- ただし、ブラウザの開発者ツール（ネットワークタブ）でリクエストヘッダーが確認できるため、公共PCでの使用は推奨しません。
+- Groqは現在無料ティアを提供していますが、使用量によっては料金が発生する場合があります。
+
+---
+
+## ⚙️ コード構成
+
+```
+index.html
+├── <style>          CSS変数システム、コンポーネント別スタイル、レスポンシブメディアクエリ
+├── <body>
+│   ├── <nav>        固定トップナビゲーション
+│   ├── .hero        ヒーローセクション（デモ数値表示）
+│   └── .main
+│       ├── アップロードパネル   ゲーム選択 / 分析設定 / ファイルアップロード / APIキー
+│       ├── プログレスパネル     分析ステップの進行表示
+│       └── 結果パネル          判定バナー / 指標カード / 動画プレイヤー / タイムライン / レポート
+└── <script>
+    ├── Utility        escHtml(), toast()
+    ├── State          グローバル状態変数
+    ├── File handling  loadFile(), handleDrop(), handleFile()
+    ├── Video player   seekTo(), togglePlay(), toggleMute(), onTimeUpdate()
+    ├── Progress       initProgress(), advanceStep(), finishProgress()
+    ├── AI prompt      buildPrompt() — ゲーム別特化プロンプト生成
+    ├── API call       startAnalysis() — fetch → JSONパース → renderResult()
+    └── Render         renderResult(), jumpTo()
+```
+
+---
+
+## 🛠️ 技術スタック
+
+- **言語**: バニラ HTML / CSS / JavaScript（フレームワーク不使用）
+- **AIモデル**: `meta-llama/llama-4-scout-17b-16e-instruct`（Groq）
+- **フォント**: Google Fonts — Syne, Space Mono, DM Sans
+- **外部依存**: なし（CDNフォントを除く）
+
+---
+
+## ⚠️ 制限事項・注意点
+
+- **AIは動画を直接分析しません。** 動画からキャプチャした単一フレーム画像とファイルメタデータ（名前・サイズ）をもとに、AIが*シミュレートされた分析結果*を生成します。
+- 結果は**教育的デモ**レベルであり、実際のアンチチートシステム（Vanguard・BattlEyeなど）と同等ではありません。
+- 分析結果を用いて他者を虚偽申告したり名誉を傷つける行為は、法的責任が生じる可能性があります。
+
+---
+
+## 🐛 変更履歴（教育参考用）
+
+このプロジェクトはコード品質向上のため複数回レビュー・修正されています。主な変更点:
+
+- `play`/`pause`アイコン: `<polygon>` → `<path id="playIcon">` に変更し`setAttribute('d')`が正常動作するよう修正
+- `URL.createObjectURL` Blobリーク防止: ファイル差し替え時に`revokeObjectURL()`を呼び出し
+- `finishProgress`ループ境界バグ修正: `i <= STEPS.length` → `i < STEPS.length`
+- フレームキャプチャタイミング: 固定`setTimeout(400)` → `seeked`イベント待機（1500msフォールバック付き）
+- AIレスポンス値のCSSクラスインジェクション防止: `verdict`・`severity`・`probType`をホワイトリスト検証
+- イベントリスナー重複登録防止: `listenersAdded`ガードで`play`/`pause`を含む全リスナーを保護
+- `escHtml()`関数をスクリプト最上部に移動し宣言順序の問題を解決
+- API移行: Anthropic Claude → Groq（OpenAI互換フォーマット、Bearer認証）
+
+---
+
+## 📄 ライセンス
+
+本プロジェクトは**教育・学習目的**で自由に使用・改変できます。
+商業利用や実際のチート検出サービスへの転用は推奨しません。
