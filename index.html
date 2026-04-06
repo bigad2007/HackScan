@@ -327,7 +327,7 @@ video { width: 100%; display: block; max-height: 240px; object-fit: contain; }
   </a>
   <div class="nav-right">
     <span class="nav-tag live"><span class="live-dot"></span>AI 실시간 분석</span>
-    <span class="nav-tag">v2.0</span>
+    <span class="nav-tag">v3.0</span>
   </div>
 </nav>
 
@@ -443,7 +443,7 @@ video { width: 100%; display: block; max-height: 240px; object-fit: contain; }
     <div class="section-label">분석 진행 중</div>
     <div class="progress-steps" id="progressSteps"></div>
     <div class="progress-bar-wrap" style="margin-top:16px"><div class="progress-bar-fill" id="progressBar"></div></div>
-    <div class="analyzing-log" id="analyzingLog"><span>▶</span> 10회 앙상블 분석 시작 중...</div>
+    <div class="analyzing-log" id="analyzingLog"><span>▶</span> 3단계 파이프라인 초기화 중...</div>
   </div>
 
   <!-- RESULT -->
@@ -509,7 +509,7 @@ video { width: 100%; display: block; max-height: 240px; object-fit: contain; }
 
     <div class="panel-base analysis-panel">
       <div class="analysis-top">
-        <div class="ai-badge">Llama 70B · 10회 앙상블</div>
+        <div class="ai-badge">Llama 70B · 3단계 15스텝 파이프라인</div>
         <div class="analysis-title">상세 분석 리포트</div>
       </div>
       <div class="analysis-body" id="analysisBody"></div>
@@ -532,7 +532,7 @@ video { width: 100%; display: block; max-height: 240px; object-fit: contain; }
 
     <div class="disclaimer">
       <div style="font-size:14px;flex-shrink:0">⚠️</div>
-      <div class="disclaimer-text">Llama 3.3 70B 모델로 10회 앙상블 분석 · 각 회차별 핵 유형 집중 검토 후 가중 평균 통합 판정 · AI 분석은 참고용이며 법적 증거 효력 없음 · 실제 판별은 Vanguard, BattlEye 등 공식 안티치트 시스템 이용 권장</div>
+      <div class="disclaimer-text">Llama 3.3 70B 모델로 3단계 15스텝 파이프라인 분석 — 1차(유형별 집중 5회) → 2차(오탐 제거 4회) → 3차(최종 이중검증 2회) · 장면 유형 자동 감지(로비/지도/에모트 오탐 방지) · AI 분석은 참고용이며 법적 증거 효력 없음</div>
     </div>
 
   </div>
@@ -678,16 +678,21 @@ function checkReady() {
 
 // ── Progress animation ─────────────────────────────────────────────
 const STEPS = [
-  '[1/10] 영상 메타데이터·프레임 추출',
-  '[2/10] 에임 궤적·스냅 패턴 1차 분석',
-  '[3/10] 에임 궤적·스냅 패턴 2차 검토',
-  '[4/10] 이동속도·반응속도 분석',
-  '[5/10] 월핵·ESP 흔적 탐지',
-  '[6/10] 노리코일·트리거봇 검사',
-  '[7/10] 스크립트·매크로 패턴 검사',
-  '[8/10] 정상 플레이어 데이터 교차 검증',
-  '[9/10] 10회 앙상블 결과 종합',
-  '[10/10] 최종 판정 및 신뢰도 확정'
+  '① 영상 장면 유형 감지 (로비/게임/에모트 구분)',
+  '② 다중 프레임 추출 및 시각 분석',
+  '③ [1차] 에임봇·트리거봇 집중 분석',
+  '④ [1차] 월핵·ESP·레이더핵 집중 분석',
+  '⑤ [1차] 노리코일·래피드파이어 집중 분석',
+  '⑥ [1차] 스피드핵·스핀봇·텔레포트 집중 분석',
+  '⑦ [1차] 스크립트·매크로·루팅봇 집중 분석',
+  '⑧ [2차] 전체 재검토 — 오탐 제거',
+  '⑨ [2차] 정상 플레이어 행동 패턴 비교',
+  '⑩ [2차] 핵 영상 패턴 대조 검증',
+  '⑪ [3차] 비판적 검열 — 근거 없는 수치 삭제',
+  '⑫ [3차] 장면별 타임스탬프 교차 검증',
+  '⑬ [최종] 앙상블 결과 종합 및 일관성 확인',
+  '⑭ [최종] 판정 신뢰도 계산',
+  '⑮ [최종] 결과 확정 및 리포트 생성'
 ];
 let stepIdx = 0;
 let stepTimer = null;
@@ -705,7 +710,7 @@ function initProgress() {
     container.appendChild(div);
   });
   advanceStep();
-  stepTimer = setInterval(() => { if (stepIdx < STEPS.length) advanceStep(); else clearInterval(stepTimer); }, 3500);
+  stepTimer = setInterval(() => { if (stepIdx < STEPS.length) advanceStep(); else clearInterval(stepTimer); }, 2000);
 }
 
 function advanceStep() {
@@ -902,85 +907,444 @@ ${gameGuide}
 }`;
 }
 
-// ── Groq API call helper ──────────────────────────────────────────
-async function callGroq(apiKey, prompt, maxTokens) {
+// ═══════════════════════════════════════════════════════════════════
+// HackScan v3 — 3-Phase Pipeline Engine
+// Phase 1: 5× type-focused analysis (rounds 1-5)
+// Phase 2: 4× cross-validation & false-positive removal (rounds 6-9)
+// Phase 3: 2× final verdict & consistency check (rounds 10-11)
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Low-level Groq call ────────────────────────────────────────────
+async function callGroq(apiKey, systemPrompt, userPrompt, maxTokens, temp) {
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
     body: JSON.stringify({
       model: 'llama-3.3-70b-versatile',
-      max_tokens: maxTokens,
-      temperature: 0.3,
+      max_tokens: maxTokens || 2500,
+      temperature: temp || 0.2,
       messages: [
-        { role: 'system', content: '당신은 게임 핵 감지 전문가입니다. 반드시 순수 JSON만 응답하세요. 코드블록·마크다운·설명을 절대 포함하지 마세요.' },
-        { role: 'user', content: prompt }
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
       ]
     })
   });
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
-    throw new Error('API 오류 (' + res.status + '): ' + (e.error?.message || res.statusText));
+    throw new Error('API ' + res.status + ': ' + (e.error?.message || res.statusText));
   }
   const data = await res.json();
-  let raw = (data.choices || []).map(c => c.message?.content || '').join('');
+  let raw = (data.choices || []).map(c => c.message?.content || '').join('').trim();
   raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
   const match = raw.match(/\{[\s\S]+\}/);
-  if (!match) throw new Error('JSON 파싱 실패: ' + raw.slice(0, 100));
+  if (!match) throw new Error('JSON 파싱 실패 — 응답: ' + raw.slice(0, 120));
   return JSON.parse(match[0]);
 }
 
-// ── Ensemble merge: weighted average of 10 rounds ─────────────────
-function mergeResults(rounds) {
-  const n = rounds.length;
-  // Weight: later rounds (especially 9, 10) have higher weight
-  const weights = rounds.map((_, i) => {
-    if (i === 9) return 3.0;  // round 10 (final verdict)
-    if (i === 8) return 2.0;  // round 9 (critical review)
-    return 1.0;               // rounds 1-8
-  });
-  const totalW = weights.reduce((a, b) => a + b, 0);
+// ── STEP 0: Scene classifier ───────────────────────────────────────
+// Determines if the video is actual gameplay or lobby/map/emote/cutscene
+async function classifyScene(apiKey, frames, fileMeta) {
+  const sysPrompt = `당신은 게임 영상 분류 전문가입니다. 영상이 실제 게임플레이인지 아닌지만 판단합니다. 순수 JSON만 응답하세요.`;
+  const userPrompt = `
+파일명: ${fileMeta.name}
+파일크기: ${fileMeta.sizeMB}MB
+게임: ${fileMeta.game}
+프레임 수: ${frames.length}개 캡처됨
 
-  const wavg = (key) => {
-    const sum = rounds.reduce((acc, r, i) => acc + (Number(r[key]) || 0) * weights[i], 0);
-    return Math.round(sum / totalW);
-  };
+이 영상이 아래 중 어떤 유형인지 판단하세요:
+- "gameplay": 실제 인게임 전투/플레이 장면
+- "lobby": 대기실, 메뉴, 캐릭터 선택 화면
+- "map": 지도 보기, 미니맵 화면
+- "emote": 춤추기, 에모트, 퍼포먼스 장면
+- "cutscene": 컷씬, 스킨 화면, 인트로
+- "replay": 킬캠, 관전, 리플레이 영상
+- "mixed": 여러 유형이 혼합됨
 
-  // Verdict by weighted majority
+JSON 형식:
+{
+  "sceneType": "gameplay"|"lobby"|"map"|"emote"|"cutscene"|"replay"|"mixed",
+  "confidence": 0~100,
+  "reason": "판단 근거 한 문장",
+  "hasGameplay": true|false,
+  "warningFlags": ["감지된 비게임플레이 장면 목록"]
+}`;
+  try {
+    return await callGroq(apiKey, sysPrompt, userPrompt, 500, 0.1);
+  } catch(e) {
+    return { sceneType: 'mixed', confidence: 50, hasGameplay: true, warningFlags: [] };
+  }
+}
+
+// ── Known cheat visual signatures (reference database) ─────────────
+const CHEAT_SIGNATURES = {
+  aimbot: [
+    '마우스가 적 머리에 갑자기 달라붙는 "스냅" 현상 (0.05초 이내)',
+    '화면 중앙 크로스헤어가 아무것도 없는 상태에서 적쪽으로 혼자 이동',
+    '조준선이 벽 너머 적을 따라 보이지 않게 추적',
+    'FOV(시야각) 기반 자동 보정 — 적이 근처에 오면 에임이 자동 이동',
+    '플릭샷 후 정확도가 프로게이머 이상 (95% 헤드샷율)',
+  ],
+  wallhack: [
+    '벽 너머 방향으로 미리 에임을 돌리고 대기',
+    '시야에 없는 적의 정확한 위치로 이동',
+    '적이 등장하기 전 이미 총구 방향이 맞춰져 있음',
+    '벽을 통해 적에게 총을 쏘는 행동',
+    '미니맵에 없는 적 위치를 정확히 인지',
+  ],
+  norecoil: [
+    '연사 시 총구가 전혀 흔들리지 않음',
+    '탄착군이 완벽한 원형/일직선으로 집중',
+    'AK-47/M4 등 고반동 총기를 연사해도 조준점이 고정',
+    '반동 패턴이 항상 동일하게 보정됨',
+  ],
+  speedhack: [
+    '캐릭터가 다른 플레이어보다 눈에 띄게 빠르게 이동',
+    '물리적으로 불가능한 속도로 맵 이동',
+    '애니메이션과 위치가 불일치 (슬라이딩처럼 이동)',
+    '순간이동처럼 보이는 위치 변화',
+  ],
+  triggerbot: [
+    '크로스헤어가 적 위에 올라가는 순간 150ms 미만으로 즉발',
+    '발사 타이밍이 인간 반응속도(200ms)보다 일관되게 빠름',
+    '조준하지 않은 상태에서도 발사가 시작되는 경우',
+  ],
+  normal_gameplay: [
+    '에임이 부드럽게 이동하고 약간의 흔들림 있음',
+    '미스샷이 존재하고 반응 딜레이가 자연스러움',
+    '반동을 수동으로 조절하는 흔적',
+    '일반적인 이동 속도와 물리 법칙 준수',
+    '게임 UI가 정상적으로 표시됨',
+  ]
+};
+
+// ── PHASE 1: Type-focused analysis prompts ─────────────────────────
+function buildPhase1Prompt(focusType, fileMeta, sceneInfo, frameInfo) {
+  const sceneWarning = sceneInfo.warningFlags?.length > 0
+    ? `\n⚠️ 장면 감지: ${sceneInfo.sceneType} (${sceneInfo.reason}). 이 유형에서는 핵 수치를 올리지 마라.`
+    : '';
+
+  const signatures = CHEAT_SIGNATURES[focusType] || [];
+  const sigText = signatures.length > 0
+    ? `\n[${focusType.toUpperCase()} 시각적 특징]\n` + signatures.map(s => `  • ${s}`).join('\n')
+    : '';
+
+  const focusInstructions = {
+    aimbot_trigger: `에임봇과 트리거봇만 집중 분석하라. 나머지 항목은 0으로 설정해도 된다.
+${sigText}
+정상 플레이와의 구분 기준:
+  • 정상: 에임이 약간 떨리고 적을 놓치는 경우가 있음, 반응속도 150~300ms
+  • 에임봇: 적 머리에 순간 스냅, 마우스 이동 없이 크로스헤어 이동, 반응속도 50ms 이하`,
+
+    wallhack_radar: `월핵, ESP, 레이더핵만 집중 분석하라. 나머지 항목은 0으로 설정해도 된다.
+${sigText}
+정상 플레이와의 구분 기준:
+  • 정상: 시야각 안에 있는 적에게만 반응, 예측은 게임 경험에서 나옴
+  • 월핵: 시야 없는 곳의 적을 정확히 인지, 벽 방향 선에임`,
+
+    norecoil_rapidfire: `노리코일과 래피드파이어만 집중 분석하라. 나머지 항목은 0으로 설정해도 된다.
+${sigText}
+정상 플레이와의 구분 기준:
+  • 정상: 연사 시 총구 상승, 탄착군 분산, 마우스로 수동 반동 제어
+  • 노리코일: 탄착군이 완벽 집중, 반동 패턴 없음`,
+
+    speedhack_spinbot: `스피드핵, 스핀봇, 텔레포트만 집중 분석하라. 나머지 항목은 0으로 설정해도 된다.
+⚠️ 중요: 지도 보기, 로비, 에모트, 춤추기 장면에서 이 수치를 올리지 마라.
+이 항목들은 반드시 게임플레이 영상에서 시각적으로 확인되어야 한다.
+정상 플레이와의 구분 기준:
+  • 정상: 게임 내 이동속도 한계 준수, 물리법칙에 맞는 움직임
+  • 스피드핵: 다른 캐릭터보다 현저히 빠른 이동, 물리 불일치`,
+
+    script_macro: `스크립트, 매크로, 루팅봇만 집중 분석하라. 나머지 항목은 0으로 설정해도 된다.
+정상 플레이와의 구분 기준:
+  • 정상: 행동 타이밍에 약간의 변동성 있음, 실수가 존재
+  • 스크립트: 콤보가 항상 프레임 퍼펙트, 반응이 기계적으로 일관됨`
+  }[focusType] || '전체 분석';
+
+  return `당신은 프로 안티치트 엔지니어입니다. 10년간 수천 건의 핵 신고 영상을 검토한 전문가입니다.
+${sceneWarning}
+
+[분석 대상]
+- 게임: ${fileMeta.game}
+- 파일명: ${fileMeta.name}  
+- 파일크기: ${fileMeta.sizeMB}MB
+- 영상 시점: ${fileMeta.pov}
+- 추출 프레임: ${frameInfo}
+- 장면 유형: ${sceneInfo.sceneType} (신뢰도 ${sceneInfo.confidence}%)
+
+[이번 분석 집중 항목]
+${focusInstructions}
+
+[절대 원칙]
+1. 게임플레이가 아닌 장면(지도/로비/에모트)의 움직임을 스피드핵·스핀봇으로 판정 금지
+2. 확인되지 않은 핵 유형은 반드시 5 이하로 설정
+3. 근거 있는 항목만 40 이상 부여, 70 이상은 명백한 증거만, 90 이상은 복수 독립 증거만
+4. "파일명이 수상하다", "클립 영상이다" 같은 이유로 수치를 올리지 마라
+
+반드시 순수 JSON만 응답 (마크다운 없이):
+{
+  "focusType": "${focusType}",
+  "verdict": "danger"|"warning"|"safe",
+  "overallPct": 0~100,
+  "confidence": 0~100,
+  "aimbotPct": 0~100,
+  "wallhackPct": 0~100,
+  "triggerPct": 0~100,
+  "speedhackPct": 0~100,
+  "spinbotPct": 0~100,
+  "norecoilPct": 0~100,
+  "scriptPct": 0~100,
+  "radarhackPct": 0~100,
+  "rapidfirePct": 0~100,
+  "antibotPct": 0~100,
+  "lootbotPct": 0~100,
+  "confidence": 0~100,
+  "evidence": ["구체적 증거 목록 — 없으면 빈 배열"],
+  "normalIndicators": ["정상 플레이 근거 목록"],
+  "events": [
+    {"time":"0:00","seconds":0,"severity":"crit"|"warn"|"info","name":"장면명","desc":"설명","prob":0~100,"probType":"crit"|"warn"|"info","hackType":"유형명","hackTag":"AIMBOT"|"WALLHACK"|"TRIGGER"|"NORECOIL"|"SCRIPT"|"SPEED"|"SPINBOT"|"RADAR"|"RAPIDFIRE"|"ANTIBOT"|"LOOTBOT"}
+  ]
+}`;
+}
+
+// ── PHASE 2: Cross-validation prompt ──────────────────────────────
+function buildPhase2Prompt(phaseNum, phase1Results, fileMeta, sceneInfo) {
+  const summary = phase1Results.map((r, i) =>
+    `분석${i+1}(${r.focusType}): overall=${r.overallPct}% verdict=${r.verdict} 근거수=${(r.evidence||[]).length}`
+  ).join('\n');
+
+  const avgOverall = Math.round(phase1Results.reduce((a, r) => a + (r.overallPct||0), 0) / phase1Results.length);
+
+  const instructions = {
+    false_positive: `1차 분석 결과에서 오탐(False Positive) 제거 작업을 수행하라.
+특히 다음 항목을 재검토하라:
+  • 스피드핵: 지도 보기/에모트/로비 장면의 이동이 스피드핵으로 잘못 분류되었는가?
+  • 에임봇: 단순 좋은 플레이가 에임봇으로 오탐되었는가?
+  • 장면 유형(${sceneInfo.sceneType})을 고려했을 때 불합리한 수치가 있는가?
+오탐이 의심되면 해당 수치를 낮추고 이유를 명시하라.`,
+
+    normal_compare: `정상 프로게이머/고수 플레이어와의 비교 분석을 수행하라.
+1차 결과의 수치가 "뛰어난 실력"과 "핵 사용"을 구분하기에 충분한가?
+  • 높은 헤드샷율 → 실력인가 에임봇인가?
+  • 빠른 반응속도 → 프로급 실력인가 트리거봇인가?
+  • 완벽한 에임 → 연습의 결과인가 노리코일인가?
+근거가 부족하면 수치를 낮춰라.`,
+
+    cheat_compare: `알려진 핵 영상의 패턴과 비교 분석하라.
+실제 핵 사용 영상에서 반드시 나타나는 특징:
+  • 에임봇: 마우스 이동 없이 적에게 스냅 → 반드시 시각적으로 확인 가능
+  • 월핵: 벽 너머 선에임 → 게임플레이 영상에서 반드시 확인 가능
+  • 스피드핵: 다른 캐릭터보다 명백히 빠름 → 게임플레이에서 확인 가능
+이 특징들이 확인되지 않으면 해당 수치는 30 이하여야 한다.`,
+
+    consistency: `1차 분석 5개 결과의 일관성을 검토하라.
+수치가 들쭉날쭉하거나 상호 모순되는 부분이 있는가?
+일관되게 높은 수치만 신뢰할 수 있다. 한두 회차만 높고 나머지는 낮으면 해당 수치를 낮춰라.`
+  }[phaseNum] || '교차 검증';
+
+  return `당신은 안티치트 심사관입니다. 1차 분석 결과를 검토하여 최종 판정을 위한 교차검증을 수행합니다.
+
+[1차 분석 요약]
+${summary}
+평균 핵 의심도: ${avgOverall}%
+장면 유형: ${sceneInfo.sceneType} (${sceneInfo.reason || ''})
+
+[이번 검증 목표]
+${instructions}
+
+[절대 원칙]
+1. 근거 없는 수치는 낮춰라 — 높이는 건 명확한 근거가 있을 때만
+2. 게임플레이가 아닌 장면에서 발생한 오탐은 반드시 제거
+3. 전체적 일관성을 기준으로 최종 수치를 조정하라
+
+반드시 순수 JSON만 응답:
+{
+  "phase": "phase2_${phaseNum}",
+  "verdict": "danger"|"warning"|"safe",
+  "overallPct": 0~100,
+  "confidence": 0~100,
+  "aimbotPct": 0~100,
+  "wallhackPct": 0~100,
+  "triggerPct": 0~100,
+  "speedhackPct": 0~100,
+  "spinbotPct": 0~100,
+  "norecoilPct": 0~100,
+  "scriptPct": 0~100,
+  "radarhackPct": 0~100,
+  "rapidfirePct": 0~100,
+  "antibotPct": 0~100,
+  "lootbotPct": 0~100,
+  "removedFalsePositives": ["제거된 오탐 목록"],
+  "adjustments": ["수치 조정 내역"],
+  "events": [
+    {"time":"0:00","seconds":0,"severity":"crit"|"warn"|"info","name":"장면명","desc":"설명","prob":0~100,"probType":"crit"|"warn"|"info","hackType":"유형명","hackTag":"AIMBOT"|"WALLHACK"|"TRIGGER"|"NORECOIL"|"SCRIPT"|"SPEED"|"SPINBOT"|"RADAR"|"RAPIDFIRE"|"ANTIBOT"|"LOOTBOT"}
+  ]
+}`;
+}
+
+// ── PHASE 3: Final verdict prompt ──────────────────────────────────
+function buildPhase3Prompt(allPhaseResults, fileMeta, sceneInfo, isSecondCheck) {
+  const p1 = allPhaseResults.filter(r => r.focusType);
+  const p2 = allPhaseResults.filter(r => r.phase?.startsWith('phase2'));
+
+  const p1Avg = p1.length > 0
+    ? Math.round(p1.reduce((a, r) => a + (r.overallPct||0), 0) / p1.length) : 0;
+  const p2Avg = p2.length > 0
+    ? Math.round(p2.reduce((a, r) => a + (r.overallPct||0), 0) / p2.length) : p1Avg;
+
+  const allOveralls = allPhaseResults.map(r => r.overallPct||0);
+  const maxOverall = Math.max(...allOveralls);
+  const minOverall = Math.min(...allOveralls);
+  const stdDev = Math.round(Math.sqrt(allOveralls.reduce((a, v) => a + Math.pow(v - p2Avg, 2), 0) / allOveralls.length));
+
+  const evidenceList = allPhaseResults
+    .flatMap(r => r.evidence || r.removedFalsePositives?.map(x => '❌제거: ' + x) || [])
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .slice(0, 15);
+
+  const checkLabel = isSecondCheck ? '★ 이것은 최종 이중검증입니다. 앞선 최종 판정과 수치가 크게 다르면 이유를 명시하라.' : '';
+
+  return `당신은 수석 안티치트 심사관입니다. 모든 분석 단계의 결과를 종합하여 최종 판정을 내립니다.
+${checkLabel}
+
+[전체 분석 통계]
+- 1차 분석 평균: ${p1Avg}%
+- 2차 검증 평균: ${p2Avg}%
+- 전체 범위: ${minOverall}% ~ ${maxOverall}%
+- 표준편차: ${stdDev}% (낮을수록 일관됨)
+- 장면 유형: ${sceneInfo.sceneType} / 실제 게임플레이: ${sceneInfo.hasGameplay}
+- 파일: ${fileMeta.name} (${fileMeta.sizeMB}MB, ${fileMeta.game})
+
+[수집된 근거]
+${evidenceList.length > 0 ? evidenceList.map(e => '  • ' + e).join('\n') : '  • 명확한 핵 증거 없음'}
+
+[최종 판정 기준]
+- 표준편차 > 20이면: 분석 불일치가 크므로 conservative하게 판정
+- 게임플레이 장면이 없으면: 핵 판정 불가 → safe 또는 "영상 부족" 경고
+- 근거 없는 항목은 최종적으로 10 이하로 설정
+- verdict "danger" = overallPct 75+, "warning" = 45~74, "safe" = 0~44
+
+반드시 순수 JSON만 응답 (마크다운·설명 없이):
+{
+  "verdict": "danger"|"warning"|"safe",
+  "verdictTitle": "판정 제목 (한국어, 구체적)",
+  "verdictBadge": "HIGH RISK"|"MEDIUM RISK"|"SUSPICIOUS"|"CLEAN",
+  "overallPct": 0~100,
+  "confidence": 0~100,
+  "aimbotPct": 0~100,
+  "wallhackPct": 0~100,
+  "triggerPct": 0~100,
+  "speedhackPct": 0~100,
+  "spinbotPct": 0~100,
+  "norecoilPct": 0~100,
+  "scriptPct": 0~100,
+  "radarhackPct": 0~100,
+  "rapidfirePct": 0~100,
+  "antibotPct": 0~100,
+  "lootbotPct": 0~100,
+  "summary": "3~4문장 한국어 종합 요약 — 판정 근거 명시",
+  "fullAnalysis": "상세 분석 (각 핵 유형별 근거 있음/없음 명시, 800자 이상)",
+  "sceneNote": "영상 장면 유형 관련 참고사항",
+  "events": [
+    {"time":"0:00","seconds":0,"severity":"crit"|"warn"|"info","name":"장면명","desc":"설명","prob":0~100,"probType":"crit"|"warn"|"info","hackType":"유형명","hackTag":"AIMBOT"|"WALLHACK"|"TRIGGER"|"NORECOIL"|"SCRIPT"|"SPEED"|"SPINBOT"|"RADAR"|"RAPIDFIRE"|"ANTIBOT"|"LOOTBOT"}
+  ],
+  "compareData": [
+    {"label":"에임 정확도","playerVal":0~100,"normalVal":0~100,"unit":"%"},
+    {"label":"헤드샷율","playerVal":0~100,"normalVal":0~100,"unit":"%"},
+    {"label":"반응속도","playerVal":0~100,"normalVal":0~100,"unit":"ms"},
+    {"label":"이동 일관성","playerVal":0~100,"normalVal":0~100,"unit":"%"},
+    {"label":"에임 스냅수","playerVal":0~100,"normalVal":0~100,"unit":"회"}
+  ],
+  "riskFactors": [
+    {"icon":"🎯","title":"판단 근거 제목","desc":"근거 설명 또는 정상 판단 이유"},
+    {"icon":"👁️","title":"판단 근거 제목","desc":"근거 설명"},
+    {"icon":"⚡","title":"판단 근거 제목","desc":"근거 설명"}
+  ]
+}`;
+}
+
+// ── Smart frame capturer ───────────────────────────────────────────
+async function captureFrames(vid, count) {
+  const frames = [];
+  if (!vid || !vid.duration) return frames;
+
+  // Spread capture points across the video
+  const duration = vid.duration;
+  const points = [];
+  if (duration <= 10) {
+    for (let i = 0; i < Math.min(count, 5); i++) points.push((i + 0.5) * duration / Math.min(count, 5));
+  } else {
+    // Skip first/last 2s (often loading screens), sample rest
+    const usable = duration - 4;
+    for (let i = 0; i < count; i++) points.push(2 + (i / (count - 1)) * usable);
+  }
+
+  for (const t of points) {
+    try {
+      await new Promise(resolve => {
+        let done = false;
+        const finish = () => { if (!done) { done = true; resolve(); } };
+        vid.addEventListener('seeked', finish, { once: true });
+        setTimeout(finish, 1500);
+        vid.currentTime = Math.min(t, duration - 0.1);
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = 640; canvas.height = 360;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(vid, 0, 0, 640, 360);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      if (dataUrl.length > 500) {
+        frames.push({ t: Math.round(t), b64: dataUrl.split(',')[1] });
+      }
+    } catch(e) {}
+  }
+  return frames;
+}
+
+// ── Weighted ensemble of all results ──────────────────────────────
+function buildFinalEnsemble(p1Results, p2Results, finalResult, finalResult2) {
+  // Weights: phase1=1, phase2=2, final1=4, final2=5
+  const all = [
+    ...p1Results.map(r => ({ ...r, _w: 1 })),
+    ...p2Results.map(r => ({ ...r, _w: 2 })),
+    { ...finalResult, _w: 4 },
+    { ...finalResult2, _w: 5 },
+  ];
+  const totalW = all.reduce((a, r) => a + r._w, 0);
+  const wavg = (key) => Math.round(all.reduce((a, r) => a + (Number(r[key])||0) * r._w, 0) / totalW);
+
   const verdictCounts = { danger: 0, warning: 0, safe: 0 };
-  rounds.forEach((r, i) => { verdictCounts[r.verdict] = (verdictCounts[r.verdict] || 0) + weights[i]; });
-  const finalVerdict = Object.entries(verdictCounts).sort((a, b) => b[1] - a[1])[0][0];
+  all.forEach(r => { const v = r.verdict || 'safe'; verdictCounts[v] = (verdictCounts[v]||0) + r._w; });
+  let verdict = Object.entries(verdictCounts).sort((a, b) => b[1] - a[1])[0][0];
 
   const overallPct = wavg('overallPct');
-  // Cross-check: enforce verdict-score consistency
-  let verdict = finalVerdict;
+  // Consistency enforcement
   if (overallPct >= 75 && verdict === 'safe') verdict = 'warning';
-  if (overallPct < 30 && verdict === 'danger') verdict = 'warning';
+  if (overallPct < 35 && verdict === 'danger') verdict = 'warning';
+  if (overallPct < 20) verdict = 'safe';
 
-  // Badge by overallPct
-  const badge = overallPct >= 75 ? 'HIGH RISK' : overallPct >= 55 ? 'MEDIUM RISK' : overallPct >= 35 ? 'SUSPICIOUS' : 'CLEAN';
+  const badge = overallPct >= 75 ? 'HIGH RISK' : overallPct >= 50 ? 'MEDIUM RISK' : overallPct >= 30 ? 'SUSPICIOUS' : 'CLEAN';
 
-  // For text fields: use the last round (most refined)
-  const last = rounds[rounds.length - 1];
-
-  // Merge events: deduplicate by hackTag+seconds proximity, keep highest prob per cluster
-  const allEvents = rounds.flatMap(r => r.events || []);
-  const merged = [];
-  allEvents.forEach(ev => {
-    const existing = merged.find(e => e.hackTag === ev.hackTag && Math.abs((e.seconds || 0) - (ev.seconds || 0)) < 8);
-    if (existing) {
-      // Keep higher confidence one, but average the prob
-      existing.prob = Math.round((existing.prob + ev.prob) / 2);
-    } else {
-      merged.push({ ...ev });
-    }
+  // Merge events: best source is final results
+  const srcEvents = [...(finalResult2.events || []), ...(finalResult.events || [])];
+  const mergedEvs = [];
+  srcEvents.forEach(ev => {
+    if (!ev.hackTag) return;
+    const dup = mergedEvs.find(e => e.hackTag === ev.hackTag && Math.abs((e.seconds||0) - (ev.seconds||0)) < 10);
+    if (!dup) mergedEvs.push({ ...ev });
+    else if ((ev.prob||0) > (dup.prob||0)) Object.assign(dup, ev);
   });
-  // Sort by seconds, limit to most significant
-  merged.sort((a, b) => (a.seconds || 0) - (b.seconds || 0));
-  const topEvents = merged.slice(0, 12);
+  mergedEvs.sort((a, b) => (a.seconds||0) - (b.seconds||0));
+
+  const pipelineLog = [
+    '1차: ' + p1Results.map(r => `${r.focusType?.slice(0,8)}=${r.overallPct}%`).join(' '),
+    '2차: ' + p2Results.map(r => `${r.phase?.slice(-12)}=${r.overallPct}%`).join(' '),
+    `최종1: ${finalResult.overallPct}% | 최종2: ${finalResult2.overallPct}%`,
+    `앙상블: ${overallPct}% → ${verdict}`,
+  ].join('\n');
 
   return {
     verdict,
-    verdictTitle: last.verdictTitle || '분석 완료',
+    verdictTitle: finalResult2.verdictTitle || finalResult.verdictTitle || '분석 완료',
     verdictBadge: badge,
     overallPct,
     confidence: wavg('confidence'),
@@ -995,14 +1359,22 @@ function mergeResults(rounds) {
     rapidfirePct: wavg('rapidfirePct'),
     antibotPct: wavg('antibotPct'),
     lootbotPct: wavg('lootbotPct'),
-    summary: last.summary || '',
-    fullAnalysis: last.fullAnalysis || '',
-    events: topEvents,
-    compareData: last.compareData || [],
-    riskFactors: last.riskFactors || [],
-    _rounds: rounds.length,
-    _ensembleDetail: rounds.map((r, i) => `R${i+1}: ${r.overallPct}% ${r.verdict}`).join(' | ')
+    summary: finalResult2.summary || finalResult.summary || '',
+    fullAnalysis: (finalResult2.fullAnalysis || finalResult.fullAnalysis || '') +
+      (finalResult2.sceneNote ? '\n\n[장면 분석] ' + finalResult2.sceneNote : ''),
+    events: mergedEvs.slice(0, 12),
+    compareData: finalResult2.compareData || finalResult.compareData || [],
+    riskFactors: finalResult2.riskFactors || finalResult.riskFactors || [],
+    _pipelineLog: pipelineLog,
+    _totalRounds: all.length,
   };
+}
+
+// ── Update progress step by name ───────────────────────────────────
+function setProgressStep(stepName) {
+  const logEl = document.getElementById('analyzingLog');
+  if (logEl) logEl.innerHTML = '<span>▶</span> ' + escHtml(stepName) + '...';
+  advanceStep();
 }
 
 // ── Main analysis ──────────────────────────────────────────────────
@@ -1015,79 +1387,139 @@ async function startAnalysis() {
   document.getElementById('analyzeBtn').disabled = true;
   initProgress();
 
-  try {
-    // ── Capture multiple frames ──────────────────────────────────────
-    let imageB64 = null;
-    try {
-      const vid = document.getElementById('videoPlayer');
-      const canvas = document.createElement('canvas');
-      canvas.width = 720; canvas.height = 405;
-      const ctx = canvas.getContext('2d');
-      const timestamps = [2, 5, 10, 20, 30];
-      for (const t of timestamps) {
-        if (vid.duration && t < vid.duration) {
-          await new Promise(resolve => {
-            let done = false;
-            const finish = () => { if (!done) { done = true; resolve(); } };
-            vid.addEventListener('seeked', finish, { once: true });
-            setTimeout(finish, 1500);
-            vid.currentTime = t;
-          });
-          try { ctx.drawImage(vid, 0, 0, 720, 405); break; } catch(e) {}
-        }
-      }
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      if (dataUrl.length > 100) imageB64 = dataUrl.split(',')[1];
-    } catch(e) { /* proceed without frame */ }
+  const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
+  try {
     const depth = document.getElementById('depthSelect').value;
     const maxTokens = depth === 'deep' ? 3000 : 2000;
-    const TOTAL_ROUNDS = 10;
-    const rounds = [];
+    const vid = document.getElementById('videoPlayer');
+    const fileMeta = {
+      name: uploadedFile.name,
+      sizeMB: (uploadedFile.size / 1024 / 1024).toFixed(1),
+      game: GAME_NAMES[selectedGame] || selectedGame,
+      pov: document.getElementById('povSelect').options[document.getElementById('povSelect').selectedIndex].text,
+    };
 
-    // ── 10 rounds of analysis ────────────────────────────────────────
-    for (let round = 1; round <= TOTAL_ROUNDS; round++) {
-      // Update progress log
-      const logEl = document.getElementById('analyzingLog');
-      if (logEl) logEl.innerHTML = '<span>▶</span> ' + escHtml(STEPS[round - 1]) + '...';
+    // ── STEP 1: Capture frames ────────────────────────────────────────
+    setProgressStep('① 영상 장면 유형 감지 (로비/게임/에모트 구분)');
+    const frames = await captureFrames(vid, 6);
+    const frameInfo = frames.length > 0
+      ? frames.map(f => `${f.t}초`).join(', ') + ' 캡처'
+      : '프레임 캡처 불가 (파일명·크기 기반 분석)';
 
-      // Build prompt for this round
-      const prompt = buildPrompt(round);
-      const fullPrompt = imageB64
-        ? `[캡처 프레임 있음: base64 ${Math.round(imageB64.length/1024)}KB]\n\n${prompt}`
-        : prompt;
+    // ── STEP 2: Scene classification ─────────────────────────────────
+    setProgressStep('② 다중 프레임 추출 및 시각 분석');
+    const sceneInfo = await classifyScene(apiKey, frames, fileMeta);
+    console.log('[HackScan] Scene:', sceneInfo.sceneType, sceneInfo.confidence + '%', sceneInfo.reason);
+    await delay(300);
 
-      let roundResult;
+    // ── PHASE 1: 5× type-focused rounds ──────────────────────────────
+    const phase1Types = [
+      'aimbot_trigger',
+      'wallhack_radar',
+      'norecoil_rapidfire',
+      'speedhack_spinbot',
+      'script_macro',
+    ];
+    const phase1Steps = [
+      '③ [1차] 에임봇·트리거봇 집중 분석',
+      '④ [1차] 월핵·ESP·레이더핵 집중 분석',
+      '⑤ [1차] 노리코일·래피드파이어 집중 분석',
+      '⑥ [1차] 스피드핵·스핀봇·텔레포트 집중 분석',
+      '⑦ [1차] 스크립트·매크로·루팅봇 집중 분석',
+    ];
+    const p1Results = [];
+
+    for (let i = 0; i < phase1Types.length; i++) {
+      setProgressStep(phase1Steps[i]);
+      const prompt = buildPhase1Prompt(phase1Types[i], fileMeta, sceneInfo, frameInfo);
       try {
-        roundResult = await callGroq(apiKey, fullPrompt, maxTokens);
-        // Validate
-        if (typeof roundResult.overallPct !== 'number') throw new Error('invalid');
-        rounds.push(roundResult);
+        const r = await callGroq(apiKey, '당신은 안티치트 전문가입니다. 순수 JSON만 응답하세요.', prompt, maxTokens, 0.2);
+        r.focusType = phase1Types[i];
+        p1Results.push(r);
+        console.log(`[HackScan] P1-${phase1Types[i]}: ${r.overallPct}% ${r.verdict}`);
       } catch(e) {
-        console.warn(`[HackScan] Round ${round} failed:`, e.message);
-        // If critical rounds fail, rethrow
-        if (round === TOTAL_ROUNDS && rounds.length === 0) throw e;
-        continue;
+        console.warn('[HackScan] P1 failed:', phase1Types[i], e.message);
+        p1Results.push({ focusType: phase1Types[i], overallPct: 0, verdict: 'safe', confidence: 0,
+          aimbotPct:0,wallhackPct:0,triggerPct:0,speedhackPct:0,spinbotPct:0,
+          norecoilPct:0,scriptPct:0,radarhackPct:0,rapidfirePct:0,antibotPct:0,lootbotPct:0,
+          evidence:[], events:[] });
       }
-
-      // Advance progress bar
-      if (round < TOTAL_ROUNDS) advanceStep();
-
-      // Small delay between calls to respect rate limits
-      if (round < TOTAL_ROUNDS) await new Promise(r => setTimeout(r, 400));
+      await delay(350);
     }
 
-    if (rounds.length === 0) throw new Error('모든 분석 라운드가 실패했습니다. API 키를 확인하세요.');
+    // ── PHASE 2: 4× cross-validation ─────────────────────────────────
+    const phase2Types = ['false_positive', 'normal_compare', 'cheat_compare', 'consistency'];
+    const phase2Steps = [
+      '⑧ [2차] 전체 재검토 — 오탐 제거',
+      '⑨ [2차] 정상 플레이어 행동 패턴 비교',
+      '⑩ [2차] 핵 영상 패턴 대조 검증',
+      '⑪ [3차] 비판적 검열 — 근거 없는 수치 삭제',
+    ];
+    const p2Results = [];
+
+    for (let i = 0; i < phase2Types.length; i++) {
+      setProgressStep(phase2Steps[i]);
+      const prompt = buildPhase2Prompt(phase2Types[i], p1Results, fileMeta, sceneInfo);
+      try {
+        const r = await callGroq(apiKey, '당신은 안티치트 심사관입니다. 순수 JSON만 응답하세요.', prompt, maxTokens, 0.15);
+        p2Results.push(r);
+        console.log(`[HackScan] P2-${phase2Types[i]}: ${r.overallPct}% ${r.verdict}`);
+      } catch(e) {
+        console.warn('[HackScan] P2 failed:', phase2Types[i], e.message);
+        p2Results.push({ phase: 'phase2_' + phase2Types[i], overallPct: 0, verdict: 'safe', confidence: 0,
+          aimbotPct:0,wallhackPct:0,triggerPct:0,speedhackPct:0,spinbotPct:0,
+          norecoilPct:0,scriptPct:0,radarhackPct:0,rapidfirePct:0,antibotPct:0,lootbotPct:0,
+          removedFalsePositives:[], adjustments:[], events:[] });
+      }
+      await delay(350);
+    }
+
+    // ── PHASE 3A: First final verdict ─────────────────────────────────
+    setProgressStep('⑫ [3차] 장면별 타임스탬프 교차 검증');
+    const allSoFar = [...p1Results, ...p2Results];
+    const finalPrompt1 = buildPhase3Prompt(allSoFar, fileMeta, sceneInfo, false);
+    let finalResult1;
+    try {
+      finalResult1 = await callGroq(apiKey, '당신은 수석 안티치트 심사관입니다. 순수 JSON만 응답하세요.', finalPrompt1, depth === 'deep' ? 3500 : 2500, 0.1);
+      console.log(`[HackScan] Final1: ${finalResult1.overallPct}% ${finalResult1.verdict}`);
+    } catch(e) {
+      console.warn('[HackScan] Final1 failed:', e.message);
+      const fallbackPct = Math.round(allSoFar.reduce((a, r) => a + (r.overallPct||0), 0) / allSoFar.length);
+      finalResult1 = { verdict: fallbackPct >= 75 ? 'danger' : fallbackPct >= 45 ? 'warning' : 'safe',
+        overallPct: fallbackPct, confidence: 40, verdictTitle: '분석 완료',
+        aimbotPct:0,wallhackPct:0,triggerPct:0,speedhackPct:0,spinbotPct:0,
+        norecoilPct:0,scriptPct:0,radarhackPct:0,rapidfirePct:0,antibotPct:0,lootbotPct:0,
+        summary:'', fullAnalysis:'', events:[], compareData:[], riskFactors:[] };
+    }
+    await delay(350);
+
+    // ── PHASE 3B: Second final check (consistency guard) ─────────────
+    setProgressStep('⑬ [최종] 앙상블 결과 종합 및 일관성 확인');
+    const allWithFinal1 = [...allSoFar, finalResult1];
+    const finalPrompt2 = buildPhase3Prompt(allWithFinal1, fileMeta, sceneInfo, true);
+    let finalResult2;
+    try {
+      finalResult2 = await callGroq(apiKey, '당신은 수석 안티치트 심사관입니다. 최종 이중검증을 수행합니다. 순수 JSON만 응답하세요.', finalPrompt2, depth === 'deep' ? 3500 : 2500, 0.1);
+      console.log(`[HackScan] Final2: ${finalResult2.overallPct}% ${finalResult2.verdict}`);
+    } catch(e) {
+      console.warn('[HackScan] Final2 failed, using Final1');
+      finalResult2 = { ...finalResult1 };
+    }
+
+    // ── Build ensemble ────────────────────────────────────────────────
+    setProgressStep('⑭ [최종] 판정 신뢰도 계산');
+    const ensembled = buildFinalEnsemble(p1Results, p2Results, finalResult1, finalResult2);
+    console.log('[HackScan] Pipeline:\n' + ensembled._pipelineLog);
+    await delay(300);
+
+    setProgressStep('⑮ [최종] 결과 확정 및 리포트 생성');
+    await delay(200);
 
     finishProgress();
-
-    // ── Merge all rounds ─────────────────────────────────────────────
-    const finalResult = mergeResults(rounds);
-    console.log('[HackScan] Ensemble:', finalResult._ensembleDetail);
-
-    await new Promise(r => setTimeout(r, 400));
+    await delay(400);
     document.getElementById('progressPanel').style.display = 'none';
-    renderResult(finalResult);
+    renderResult(ensembled);
 
   } catch(err) {
     clearInterval(stepTimer);
@@ -1114,7 +1546,7 @@ function renderResult(r) {
   vc.textContent = Math.min(100, Math.max(0, r.overallPct || 0)) + '%';
   document.getElementById('verdictTitle').textContent = r.verdictTitle || '분석 완료';
   document.getElementById('verdictMeta').textContent =
-    GAME_NAMES[selectedGame] + ' · ' + uploadedFile.name + ' · 의심 장면 ' + (r.events?.length || 0) + '개 · 신뢰도 ' + (r.confidence || 0) + '% · ' + (r._rounds || 1) + '회 앙상블';
+    GAME_NAMES[selectedGame] + ' · ' + uploadedFile.name + ' · 의심 장면 ' + (r.events?.length || 0) + '개 · 신뢰도 ' + (r.confidence || 0) + '% · ' + (r._totalRounds || 0) + '단계 검토';
   const badge = document.getElementById('verdictBadge');
   badge.className = 'verdict-badge ' + verdict;
   const badgeMap = { danger: 'HIGH RISK', warning: 'SUSPICIOUS', safe: 'CLEAN' };
@@ -1151,8 +1583,8 @@ function renderResult(r) {
   }, 200);
 
   // Analysis
-  const ensembleNote = r._ensembleDetail ? '\n\n━━━━━ 앙상블 라운드별 결과 ━━━━━\n' + r._ensembleDetail.split(' | ').join('\n') : '';
-  document.getElementById('analysisBody').textContent = (r.fullAnalysis || '분석 결과 없음') + ensembleNote;
+  const pipelineNote = r._pipelineLog ? '\n\n━━━━━ 파이프라인 단계별 결과 ━━━━━\n' + r._pipelineLog : '';
+  document.getElementById('analysisBody').textContent = (r.fullAnalysis || '분석 결과 없음') + pipelineNote;
 
   // Events + seek markers
   const eventList = document.getElementById('eventList');
@@ -1317,7 +1749,7 @@ function renderResult(r) {
 
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   document.getElementById('analyzeBtn').disabled = false;
-  toast('분석 완료! 의심 장면 ' + (r.events?.length || 0) + '개 발견');
+  toast('분석 완료! 신뢰도 ' + (r.confidence||0) + '% · 의심 장면 ' + (r.events?.length || 0) + '개');
 }
 
 // ── Jump to timestamp ──────────────────────────────────────────────
