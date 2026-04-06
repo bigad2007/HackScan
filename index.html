@@ -426,16 +426,16 @@ video { width: 100%; display: block; max-height: 240px; object-fit: contain; }
     </div>
     <input type="file" id="fileInput" accept="video/*" style="display:none" onchange="handleFile(this)">
 
-    <div class="section-label" style="margin-bottom:8px">04 — Anthropic API 키 (무료)</div>
+    <div class="section-label" style="margin-bottom:8px">04 — Groq API 키 (무료)</div>
     <div class="api-row">
-      <span class="api-label">sk-ant-</span>
+      <span class="api-label">gsk_</span>
       <input class="api-input" id="apiKeyInput" type="password" placeholder="API 키를 붙여넣으세요 — 브라우저 밖으로 전송되지 않습니다" autocomplete="off" />
       <button class="btn-analyze" id="analyzeBtn" onclick="startAnalysis()" disabled>
         <svg viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         분석 시작
       </button>
     </div>
-    <div class="api-note">⚡ API 키는 Anthropic에 직접 전송됩니다. 이 사이트 서버에는 절대 저장되지 않습니다 · <a href="https://console.anthropic.com" target="_blank" rel="noopener">무료 API 키 발급 →</a></div>
+    <div class="api-note">⚡ API 키는 Groq에 직접 전송됩니다. 이 사이트 서버에는 절대 저장되지 않습니다 · <a href="https://console.groq.com/keys" target="_blank" rel="noopener">무료 API 키 발급 →</a></div>
   </div>
 
   <!-- PROGRESS -->
@@ -930,19 +930,19 @@ async function startAnalysis() {
         ]
       : prompt;
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
+        'Authorization': 'Bearer ' + apiKey
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
         max_tokens: maxTokens,
-        system: '당신은 게임 핵 감지 전문가입니다. 요청한 JSON 형식으로만 응답하세요. 코드블록이나 추가 설명 없이 순수 JSON만 출력하세요.',
-        messages: [{ role: 'user', content: userContent }]
+        messages: [
+          { role: 'system', content: '당신은 게임 핵 감지 전문가입니다. 요청한 JSON 형식으로만 응답하세요. 코드블록이나 추가 설명 없이 순수 JSON만 출력하세요.' },
+          { role: 'user', content: typeof userContent === 'string' ? userContent : userContent.map(c => c.type === 'text' ? c.text : '[이미지 첨부됨]').join('\n') }
+        ]
       })
     });
 
@@ -955,7 +955,7 @@ async function startAnalysis() {
     }
 
     const data = await res.json();
-    let rawText = (data.content || []).map(c => c.text || '').join('');
+    let rawText = (data.choices || []).map(c => c.message?.content || '').join('');
 
     // Robust JSON extraction
     let result;
